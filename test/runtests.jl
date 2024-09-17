@@ -4,6 +4,13 @@ using Test
 @testset "GradOptimizer.jl" begin
     # Write your tests here.
 
+    function loss_func(data1, data2, θ)
+
+        data2_1 = θ[2] * data2 .+ θ[1]
+
+        return data1, data2_1
+    end
+
     epochs = 10000
     gd_param = gd_parameter([0.0,0.0], [0.0,0.0], 1.0e-3, epochs, 0.001, true, 100, 0.01, 0.9, 0.999, 1.0e-6, loss_func, 1)
 
@@ -22,5 +29,4 @@ using Test
     @test loss < 0.001
     @test 2.5 < θ[1] && θ[1] < 3.5
     @test 2.5 < θ[2] && θ[2] < 3.5
-
 end
