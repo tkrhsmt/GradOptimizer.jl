@@ -74,9 +74,40 @@ function kl_divergence(data1, data2)
     p .+= 1.0e-4
     q .+= 1.0e-4
     #KL情報量の計算
-    kl_div = sum(p .* log.(p ./ q) * dx)
+    kl_div = sum(p .* log.(p ./ q))
 
     return kl_div
+end
+
+function mutual_info(data1, data2)
+
+    #推定範囲の設定
+    dx = 3.49 * std(data1) / (length(data1)^(1/3))
+    x = [minimum(data1):dx:maximum(data1);]
+    dy = 3.49 * std(data2) / (length(data2)^(1/3))
+    y = [minimum(data2):dy:maximum(data2);]
+
+    #ヒストグラムによる確率密度分布の推定
+    p = fit(Histogram, (data1, data2), (x, y)).weights / length(data1)
+
+    #ゼロ割を防ぐための誤差量を追加
+    p1 = sum(p, dims=2)
+    p2 = sum(p, dims=1)
+
+    #相互情報量の計算
+    num1 = length(p1)
+    num2 = length(p2)
+    mi = 0.0
+    for j in 1:num2
+        for i in 1:num1
+            if p[i, j] != 0 && p1[i] != 0 && p2[j] != 0
+                mi += p[i, j] * (log(p[i, j] / (p1[i] * p2[j])))
+            end
+        end
+    end
+
+    return mi
+
 end
 
 """
@@ -94,7 +125,9 @@ Calculates the loss based on the selected loss function (KL divergence or mean s
 - `loss::Float64`: Computed loss based on the chosen loss function.
 
 # Notes
-- Selects the KL divergence if `gd_prm.select_lossfunc == 1`, otherwise it computes mean squared error.
+- gd_prm.select_lossfunc == 1 : KL Divergence
+- gd_prm.select_lossfunc == 2 : mutual information
+- otherwise : Squared Error
 """
 function Loss_function(data1, data2, θ, gd_prm)
 
@@ -104,8 +137,11 @@ function Loss_function(data1, data2, θ, gd_prm)
     if gd_prm.select_lossfunc == 1
         # KL情報量
         return kl_divergence(data1_1, data2_1)
+    elseif gd_prm.select_lossfunc == 2
+        # 相互情報量
+        return - mutual_info(data1_1, data2_1)
     else
-        #二乗誤差
+        # 二乗誤差
         return sum((data1_1 .- data2_1).^ 2)
     end
 end
@@ -210,13 +246,20 @@ function train_commit(data1, data2, θ, gd_prm)
     end
 
     loss = 0.0
+    loss_min = 10000.0
+    θ_min = θ
 
     for epoch in 1:gd_prm.epochs
         θ, loss, gd_prm = train_step(data1, data2, θ, gd_prm)
 
+        if loss < loss_min
+            θ_min = θ
+            loss_min = loss
+        end
+
         if loss < gd_prm.loss_eps
             if gd_prm.log
-                println("train end! :: last epoch -> $epoch :: loss -> $loss")
+                println("train end! :: last epoch -> $epoch :: loss -> $loss_min")
                 break
             end
         end
@@ -227,7 +270,7 @@ function train_commit(data1, data2, θ, gd_prm)
 
     end
 
-    return θ, loss
+    return θ_min, loss_min
 end
 
 """

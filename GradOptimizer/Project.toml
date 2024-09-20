@@ -1,0 +1,4 @@
+name = "GradOptimizer"
+uuid = "ef152f3e-23f5-4920-a4a3-e77bfa6cd17a"
+authors = ["T.Hashimoto <tkrhsmt@gmail.com>"]
+version = "0.1.0"
